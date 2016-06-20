@@ -1,0 +1,6 @@
+# NOTE: These sample values are used by the mock tests.
+username: my-name@my-place.com
+password: 'my-password'
+client_id:     32-hex-digit-id
+client_secret: 32-hex-digit-secret
+workspace_id:  32-hex-digit-workspace
