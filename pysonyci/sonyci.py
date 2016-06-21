@@ -247,6 +247,16 @@ class SonyCi(object):
         json_resp = req.json()
         return json_resp['folderId']
 
+    def delete_folder(self, folder_id):
+        url = SONYCI_URI + '/folders/%s' % folder_id
+        req = requests.delete(url, headers=self.header_auth)
+        json_resp = req.json()
+
+        if json_resp['message'] == 'Folder was deleted.':
+            return True
+        else:
+            return False
+
     def archive(self, asset_id):
         url = SONYCI_URI + '/assets/%s/archive' % asset_id
         req = requests.post(url, headers=self.header_auth)
@@ -313,5 +323,5 @@ if __name__ == "__main__":
     # ci.upload('/Users/predat/Downloads/cosmos.mp4', folder_id=test_folder_id)
 
     # ci.download(asset_id='0b20f616d4d84b148142618bf5376827')
-    
+
     print ci.create_folder('Vantage folder')
