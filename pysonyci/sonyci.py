@@ -300,6 +300,16 @@ class SonyCi(object):
                     if chunk:
                         fp.write(chunk)
 
+    def delete_asset(self, asset_id):
+        url = SONYCI_URI + '/assets/%s'
+        req = requests.delete(url, headers=self.header_auth)
+        json_resp = req.json()
+
+        if json_resp['message'] == 'Asset was deleted.':
+            return True
+        else:
+            return False
+
 
 if __name__ == "__main__":
     cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_hw.cfg"
