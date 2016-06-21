@@ -14,7 +14,7 @@ except ImportError:
 SONYCI_URI = "https://api.cimediacloud.com"
 SINGLEPART_URI = 'https://io.cimediacloud.com/upload'
 MULTIPART_URI = 'https://io.cimediacloud.com/upload/multipart'
-CHUNK_SIZE = 50 * 1024 * 1024
+CHUNK_SIZE = 10 * 1024 * 1024
 
 
 class SonyCiException(Exception):
@@ -36,33 +36,31 @@ class SonyCi(object):
         else:
             print("Config file not found.")
             sys.exit(1)
-
         self._authenticate(cfg)
-
 
     def _authenticate(self, cfg):
         url = SONYCI_URI + '/oauth2/token'
         data = {'grant_type': 'password',
-                'client_id': cfg.get('general','client_id'),
-                'client_secret': cfg.get('general','client_secret')}
+                'client_id': cfg.get('general', 'client_id'),
+                'client_secret': cfg.get('general', 'client_secret')}
         auth = HTTPBasicAuth(cfg.get('general', 'username'),
-                             cfg.get('general','password'))
+                             cfg.get('general', 'password'))
         req = requests.post(url, data=data, auth=auth)
 
         json_resp = req.json()
         if req.status_code != requests.codes.ok:
-            raise SonyCiException(json_resp['error'], json_resp['error_description'])
+            raise SonyCiException(json_resp['error'],
+                                  json_resp['error_description'])
 
         self.access_token = json_resp['access_token']
         self.header_auth = {'Authorization': 'Bearer %s' % self.access_token}
 
-        if cfg.get('general','workspace_id'):
-            self.workspace_id = cfg.get('general','workspace_id')
+        if cfg.get('general', 'workspace_id'):
+            self.workspace_id = cfg.get('general', 'workspace_id')
         else:
             for w in self.workspaces(fields='name,class'):
                 if 'Personal' in w['class']:
                     self.workspace_id = w['id']
-
 
     def workspaces(self, limit=50, offset=0, fields='class'):
         url = SONYCI_URI + '/workspaces'
@@ -77,9 +75,10 @@ class SonyCi(object):
             for el in json_resp['items']:
                 yield el
 
-
-    def list(self, kind='all', limit=50, offset=0, fields='description, parentId, folder'):
-        if self.workspace_id != None:
+    # def list(self, kind='all', limit=50, offset=0,
+    #          fields='description, parentId, folder'):
+    def list(self, kind='all', limit=50, offset=0, fields='metadata'):
+        if self.workspace_id:
             url = SONYCI_URI + '/workspaces/%s/contents' % self.workspace_id
         else:
             url = SONYCI_URI + '/workspaces'
@@ -92,13 +91,11 @@ class SonyCi(object):
 
         return json_resp
 
-
     def items(self):
         elts = self.list()
         if elts['count'] >= 1:
             for el in elts['items']:
                 yield el
-
 
     def assets(self):
         elts = self.list(kind='asset')
@@ -112,9 +109,8 @@ class SonyCi(object):
             for el in elts['items']:
                 yield el
 
-
     def search(self, name, limit=50, offset=0, kind="all", workspace_id=None):
-        if workspace_id == None:
+        if not workspace_id:
             workspace_id = self.workspace_id
 
         url = SONYCI_URI + '/workspaces/%s/search' % workspace_id
@@ -125,20 +121,22 @@ class SonyCi(object):
         req = requests.get(url, params=params, headers=self.header_auth)
         return req.json()
 
-
-    def upload(self, file_path, folder_id=None):
+    def upload(self, file_path, folder_id=None, metadata={}):
         if os.path.getsize(file_path) >= 5 * 1024 * 1024:
             print('Start multipart upload')
-            asset_id = self._initiate_multipart_upload(file_path, folder_id)
+            asset_id = self._initiate_multipart_upload(file_path,
+                                                       folder_id, metadata)
             self._do_multipart_upload_part_parallel(file_path, asset_id)
             return self._complete_multipart_upload(asset_id)
         else:
             return self._singlepart_upload(file_path)
 
-
-    def _initiate_multipart_upload(self, file_path, folder_id=None):
+    def _initiate_multipart_upload(self, file_path, folder_id=None,
+                                   metadata={}):
         data = {'name': os.path.basename(file_path),
-                'size': os.path.getsize(file_path)}
+                'size': os.path.getsize(file_path),
+                'metadata': metadata}
+
         if folder_id:
             data['folderId'] = folder_id
 
@@ -147,11 +145,9 @@ class SonyCi(object):
         json_resp = req.json()
         return json_resp['assetId']
 
-
     def _do_multipart_upload_part(self, file_path, asset_id):
         headers = {'Authorization': 'Bearer %s' % self.access_token,
                    'Content-Type': 'application/octet-stream'}
-
         s = requests.Session()
         part = 0
         with open(file_path, 'rb') as fp:
@@ -159,13 +155,13 @@ class SonyCi(object):
                 part = part + 1
                 url = MULTIPART_URI + '/%s/%s' % (asset_id, part)
                 buf = fp.read(CHUNK_SIZE)
-                if not buf: break
-                #req = requests.put(url, data=buf, headers=headers)
+                if not buf:
+                    break
+                # req = requests.put(url, data=buf, headers=headers)
                 req = s.put(url, data=buf, headers=headers)
                 resp = req.text
                 print('Part: %s' % part)
                 print(resp)
-
 
     def _do_multipart_upload_part_parallel(self, file_path, asset_id):
         from Queue import Queue
@@ -183,7 +179,7 @@ class SonyCi(object):
                 print(resp)
                 q.task_done()
 
-        for i in range(8):
+        for i in range(4):
             t = Thread(target=worker)
             t.setDaemon(True)
             t.start()
@@ -194,11 +190,11 @@ class SonyCi(object):
                 part = part + 1
                 url = MULTIPART_URI + '/%s/%s' % (asset_id, part)
                 buf = fp.read(CHUNK_SIZE)
-                if not buf: break
+                if not buf:
+                    break
                 data = [url, buf]
                 q.put(data)
         q.join()
-
 
     def _complete_multipart_upload(self, asset_id):
         url = MULTIPART_URI + '/%s/complete' % asset_id
@@ -207,42 +203,43 @@ class SonyCi(object):
         resp = req.text
         print(resp)
 
-
     def _singlepart_upload(self, file_path):
         files = {'file': open(file_path, 'r')}
-        req = requests.post(SINGLEPART_URI, files=files, headers=self.header_auth)
+        req = requests.post(SINGLEPART_URI,
+                            files=files, headers=self.header_auth)
         json_resp = req.json()
         return json_resp['assetId']
-
 
     def create_mediabox(self, name, asset_ids, type, allow_download=False,
                         recipients=[], message=None, password=None,
                         expiration_days=None, expiration_date=None,
                         send_notifications=False, notify_on_open=False):
-
         data = {'name': name,
                 'assetIds': asset_ids,
                 'type': type,
                 'recipients': recipients}
 
-        if message: data['message'] = message
-        if password: data['password'] = password
-        if expiration_days: data['expirationDays'] = expiration_days
-        if expiration_date: data['expirationDate'] = expiration_date
-        if send_notifications: data['sendNotifications'] = 'true'
-        if notify_on_open: data['notifyOnOpen'] = 'true'
+        if message:
+            data['message'] = message
+        if password:
+            data['password'] = password
+        if expiration_days:
+            data['expirationDays'] = expiration_days
+        if expiration_date:
+            data['expirationDate'] = expiration_date
+        if send_notifications:
+            data['sendNotifications'] = 'true'
+        if notify_on_open:
+            data['notifyOnOpen'] = 'true'
 
         url = SONYCI_URI + '/mediaboxes'
-
         req = requests.post(url, json=data, headers=self.header_auth)
 
         json_resp = req.json()
         return json_resp['mediaboxId'], json_resp['link']
 
-
     def archive(self, asset_id):
         url = SONYCI_URI + '/assets/%s/archive' % asset_id
-
         req = requests.post(url, headers=self.header_auth)
         json_resp = req.json()
 
@@ -251,9 +248,7 @@ class SonyCi(object):
         else:
             return False
 
-
     def download(self, asset_id):
-
         for a in self.assets():
             if asset_id in a['id']:
                 name = a['name']
@@ -274,43 +269,38 @@ class SonyCi(object):
 if __name__ == "__main__":
     cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_hw.cfg"
     ci = SonyCi(cfg_file)
-    #print(ci.access_token)
-
+    # print(ci.access_token)
 
     # get workspaces
-    for w in ci.workspaces(fields='name,class'):
-        if 'Personal' in w['class']:
-            print w
-
+    # for w in ci.workspaces(fields='name,class'):
+    #     if 'Personal' in w['class']:
+    #         print w
 
     # get folders
-    #for f in ci.folders():
-    #    print f
-
+    # for f in ci.folders():
+    #     print f
 
     # get assets
-    for a in ci.assets():
-         print a
+    # for a in ci.assets():
+    #      print a
 
-
-    #for e in ci.items():
-    #    print('-' * 80)
-    #    pprint(e)
-
+    # for e in ci.items():
+    #     print('-' * 80)
+    #     pprint(e)
 
     # create Mediabox
-    #m = ci.create_mediabox(name='Test_mediabox',
-    #                   asset_ids=['a6679a183d2942e4a9822096a4ede2d0',
-    #                              '0b20f616d4d84b148142618bf5376827'],
-    #                   type='Public',
-    #                   recipients=['sylvain@predat.fr'],
-    #                   expiration_days=5)
-    #print(m)
+    # m = ci.create_mediabox(name='Test_mediabox',
+    #                        asset_ids=['a6679a183d2942e4a9822096a4ede2d0',
+    #                                   '0b20f616d4d84b148142618bf5376827'],
+    #                        type='Public',
+    #                        recipients=['sylvain@predat.fr'],
+    #                        expiration_days=5)
+    # print(m)
 
-    #ci.upload('/Users/predat/Downloads/cosmos.mp4')
+    # ci.upload('/Users/predat/Downloads/1080p.mp4')
 
-    #json_resp = ci.search('TEST', kind='folder')
-    #test_folder_id = json_resp['items'][0]['id']
-    #ci.upload('/Users/predat/Downloads/cosmos.mp4', folder_id=test_folder_id)
+    # json_resp = ci.search('TEST', kind='folder')
+    # test_folder_id = json_resp['items'][0]['id']
+    # ci.upload('/Users/predat/Downloads/cosmos.mp4', folder_id=test_folder_id)
 
-    #ci.download(asset_id='0b20f616d4d84b148142618bf5376827')
+    # ci.download(asset_id='0b20f616d4d84b148142618bf5376827')
