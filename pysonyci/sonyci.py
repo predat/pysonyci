@@ -2,11 +2,13 @@
 
 import os
 import sys
-import yaml
 import requests
 from requests.auth import HTTPBasicAuth
 
-from pprint import pprint
+try:
+    from configparser import ConfigParser
+except ImportError:
+    from ConfigParser import ConfigParser  # ver. < 3.0
 
 
 SONYCI_URI = "https://api.cimediacloud.com"
@@ -29,12 +31,8 @@ class SonyCi(object):
 
     def __init__(self, config_path=None):
         if os.path.exists(config_path):
-            with open(config_path, 'r') as fp:
-                try:
-                    cfg = yaml.load(fp)
-                except yaml.YAMLError as exc:
-                    print(exc)
-                    sys.exit(1)
+            cfg = ConfigParser()
+            cfg.read(config_path)
         else:
             print("Config file not found.")
             sys.exit(1)
@@ -45,9 +43,10 @@ class SonyCi(object):
     def _authenticate(self, cfg):
         url = SONYCI_URI + '/oauth2/token'
         data = {'grant_type': 'password',
-                'client_id': cfg['client_id'],
-                'client_secret': cfg['client_secret']}
-        auth = HTTPBasicAuth(cfg['username'], cfg['password'])
+                'client_id': cfg.get('general','client_id'),
+                'client_secret': cfg.get('general','client_secret')}
+        auth = HTTPBasicAuth(cfg.get('general', 'username'),
+                             cfg.get('general','password'))
         req = requests.post(url, data=data, auth=auth)
 
         json_resp = req.json()
@@ -57,10 +56,12 @@ class SonyCi(object):
         self.access_token = json_resp['access_token']
         self.header_auth = {'Authorization': 'Bearer %s' % self.access_token}
 
-        if cfg['workspace_id'] != None:
-            self.workspace_id = cfg['workspace_id']
+        if cfg.get('general','workspace_id'):
+            self.workspace_id = cfg.get('general','workspace_id')
         else:
-            self.workspace_id = None
+            for w in self.workspaces(fields='name,class'):
+                if 'Personal' in w['class']:
+                    self.workspace_id = w['id']
 
 
     def workspaces(self, limit=50, offset=0, fields='class'):
@@ -271,14 +272,15 @@ class SonyCi(object):
 
 
 if __name__ == "__main__":
-    cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_hw.yml"
+    cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_hw.cfg"
     ci = SonyCi(cfg_file)
     #print(ci.access_token)
 
 
     # get workspaces
-    #for w in ci.workspaces(fields='name'):
-    #    print w
+    for w in ci.workspaces(fields='name,class'):
+        if 'Personal' in w['class']:
+            print w
 
 
     # get folders
@@ -287,8 +289,8 @@ if __name__ == "__main__":
 
 
     # get assets
-    #for a in ci.assets():
-    #     print a
+    for a in ci.assets():
+         print a
 
 
     #for e in ci.items():
@@ -311,4 +313,4 @@ if __name__ == "__main__":
     #test_folder_id = json_resp['items'][0]['id']
     #ci.upload('/Users/predat/Downloads/cosmos.mp4', folder_id=test_folder_id)
 
-    ci.download(asset_id='0b20f616d4d84b148142618bf5376827')
+    #ci.download(asset_id='0b20f616d4d84b148142618bf5376827')

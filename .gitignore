@@ -28,4 +28,4 @@ pip-delete-this-directory.txt
 .DS_Store
 
 # config
-config/*.yml
+config/*.cfg
