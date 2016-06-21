@@ -257,6 +257,16 @@ class SonyCi(object):
         else:
             return False
 
+    def trash_folder(self, folder_id):
+        url = SONYCI_URI + '/folders/%s/trash' % folder_id
+        req = requests.post(url, headers=self.header_auth)
+        json_resp = req.json()
+
+        if json_resp['message'] == 'Folder was trashed.':
+            return True
+        else:
+            return False
+
     def archive(self, asset_id):
         url = SONYCI_URI + '/assets/%s/archive' % asset_id
         req = requests.post(url, headers=self.header_auth)
