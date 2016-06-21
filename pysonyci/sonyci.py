@@ -247,6 +247,12 @@ class SonyCi(object):
         json_resp = req.json()
         return json_resp['folderId']
 
+    def detail_folder(self, folder_id):
+        url = SONYCI_URI + '/folders/%s' % folder_id
+        req = requests.get(url, headers=self.header_auth)
+        json_resp = req.json()
+        return json_resp
+
     def delete_folder(self, folder_id):
         url = SONYCI_URI + '/folders/%s' % folder_id
         req = requests.delete(url, headers=self.header_auth)
@@ -334,4 +340,7 @@ if __name__ == "__main__":
 
     # ci.download(asset_id='0b20f616d4d84b148142618bf5376827')
 
-    print ci.create_folder('Vantage folder')
+    folder_id = ci.create_folder(name='Folder')
+    sub_folder_id = ci.create_folder(name='SubFolder', parent_folder_id=folder_id)
+
+    #print ci.detail_folder('7bd1bde8782a4870a0bbc9ec7b8998be')
