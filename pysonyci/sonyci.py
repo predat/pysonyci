@@ -238,6 +238,15 @@ class SonyCi(object):
         json_resp = req.json()
         return json_resp['mediaboxId'], json_resp['link']
 
+    def create_folder(self, name, parent_folder_id=None):
+        url = SONYCI_URI + '/folders'
+        data = {'name': name}
+        if parent_folder_id:
+            data['parentFolderId'] = parent_folder_id
+        req = requests.post(url, json=data, headers=self.header_auth)
+        json_resp = req.json()
+        return json_resp['folderId']
+
     def archive(self, asset_id):
         url = SONYCI_URI + '/assets/%s/archive' % asset_id
         req = requests.post(url, headers=self.header_auth)
@@ -304,3 +313,5 @@ if __name__ == "__main__":
     # ci.upload('/Users/predat/Downloads/cosmos.mp4', folder_id=test_folder_id)
 
     # ci.download(asset_id='0b20f616d4d84b148142618bf5376827')
+    
+    print ci.create_folder('Vantage folder')
