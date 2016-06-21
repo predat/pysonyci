@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf8
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 exec(open('pysonyci/version.py').read())
 
@@ -22,4 +22,5 @@ setup(
     description='Python wrapper package for Sony Ci API',
     long_description=open('README.md').read(),
     install_requires=["requests"],
+    packages=find_packages(exclude=['contrib', 'docs', 'tests'])
 )
