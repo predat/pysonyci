@@ -121,17 +121,20 @@ class SonyCi(object):
         req = requests.get(url, params=params, headers=self.header_auth)
         return req.json()
 
-    def upload(self, file_path, folder_id=None, metadata={}):
+    def upload(self, file_path, folder_id=None, workspace_id=None, metadata={}):
         if os.path.getsize(file_path) >= 5 * 1024 * 1024:
             print('Start multipart upload')
             asset_id = self._initiate_multipart_upload(file_path,
-                                                       folder_id, metadata)
+                                                       folder_id,
+                                                       workspace_id,
+                                                       metadata)
             self._do_multipart_upload_part_parallel(file_path, asset_id)
             return self._complete_multipart_upload(asset_id)
         else:
-            return self._singlepart_upload(file_path)
+            return self._singlepart_upload(file_path, folder_id, workspace_id)
 
     def _initiate_multipart_upload(self, file_path, folder_id=None,
+                                   workspace_id=None,
                                    metadata={}):
         data = {'name': os.path.basename(file_path),
                 'size': os.path.getsize(file_path),
@@ -139,6 +142,11 @@ class SonyCi(object):
 
         if folder_id:
             data['folderId'] = folder_id
+
+        if workspace_id:
+            data['workspaceId'] = workspace_id
+        else:
+            data['workspaceId'] = self.workspace_id
 
         url = MULTIPART_URI
         req = requests.post(url, json=data, headers=self.header_auth)
@@ -203,7 +211,7 @@ class SonyCi(object):
         resp = req.text
         print(resp)
 
-    def _singlepart_upload(self, file_path):
+    def _singlepart_upload(self, file_path, folder_id, workspace_id):
         files = {'file': open(file_path, 'r')}
         req = requests.post(SINGLEPART_URI,
                             files=files, headers=self.header_auth)
@@ -238,11 +246,19 @@ class SonyCi(object):
         json_resp = req.json()
         return json_resp['mediaboxId'], json_resp['link']
 
-    def create_folder(self, name, parent_folder_id=None):
+    def create_folder(self, name, parent_folder_id=None, workspace_id=None):
         url = SONYCI_URI + '/folders'
         data = {'name': name}
         if parent_folder_id:
             data['parentFolderId'] = parent_folder_id
+
+        if workspace_id:
+            data['workspaceId'] = workspace_id
+        else:
+            data['workspaceId'] = self.workspace_id
+
+        print('----------------------\n%s' % data )
+
         req = requests.post(url, json=data, headers=self.header_auth)
         json_resp = req.json()
         return json_resp['folderId']
@@ -312,22 +328,24 @@ class SonyCi(object):
 
 
 if __name__ == "__main__":
-    cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_hw.cfg"
+    #cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_cap.cfg"
+    cfg_file = '/tmp/ci_hw.cfg'
     ci = SonyCi(cfg_file)
     # print(ci.access_token)
 
     # get workspaces
-    # for w in ci.workspaces(fields='name,class'):
-    #     if 'Personal' in w['class']:
-    #         print w
+    for w in ci.workspaces(fields='name,class'):
+         #if 'Personal' in w['class']:
+        print w
 
     # get folders
-    # for f in ci.folders():
-    #     print f
+    for f in ci.folders():
+        #if f['name'] == 'Folder':
+        print f
 
     # get assets
-    # for a in ci.assets():
-    #      print a
+    #for a in ci.assets():
+    #    print a
 
     # for e in ci.items():
     #     print('-' * 80)
@@ -350,7 +368,7 @@ if __name__ == "__main__":
 
     # ci.download(asset_id='0b20f616d4d84b148142618bf5376827')
 
-    folder_id = ci.create_folder(name='Folder')
-    sub_folder_id = ci.create_folder(name='SubFolder', parent_folder_id=folder_id)
+    #folder_id = ci.create_folder(name='Folder')
+    #sub_folder_id = ci.create_folder(name='SubFolder', parent_folder_id=folder_id)
 
     #print ci.detail_folder('7bd1bde8782a4870a0bbc9ec7b8998be')
