@@ -2,7 +2,9 @@
 
 import os
 import sys
+import logging
 import requests
+import json
 from requests.auth import HTTPBasicAuth
 
 try:
@@ -15,6 +17,8 @@ SONYCI_URI = "https://api.cimediacloud.com"
 SINGLEPART_URI = 'https://io.cimediacloud.com/upload'
 MULTIPART_URI = 'https://io.cimediacloud.com/upload/multipart'
 CHUNK_SIZE = 10 * 1024 * 1024
+
+log = logging.getLogger(__name__)
 
 
 class SonyCiException(Exception):
@@ -48,6 +52,8 @@ class SonyCi(object):
         req = requests.post(url, data=data, auth=auth)
 
         json_resp = req.json()
+        log.debug("auth: \n%s" % json.dumps(json_resp, indent=4))
+
         if req.status_code != requests.codes.ok:
             raise SonyCiException(json_resp['error'],
                                   json_resp['error_description'])
@@ -70,6 +76,7 @@ class SonyCi(object):
 
         req = requests.get(url, params=params, headers=self.header_auth)
         json_resp = req.json()
+        log.debug("workspaces: \n%s" % json.dumps(json_resp, indent=4))
 
         if json_resp['count'] >= 1:
             for el in json_resp['items']:
@@ -88,6 +95,7 @@ class SonyCi(object):
                   'fields': fields}
         req = requests.get(url, params=params, headers=self.header_auth)
         json_resp = req.json()
+        log.debug("list: \n%s" % json.dumps(json_resp, indent=4))
 
         return json_resp
 
@@ -95,18 +103,21 @@ class SonyCi(object):
         elts = self.list()
         if elts['count'] >= 1:
             for el in elts['items']:
+                log.debug("items: \n%s" % json.dumps(el, indent=4))
                 yield el
 
     def assets(self):
         elts = self.list(kind='asset')
         if elts['count'] >= 1:
             for el in elts['items']:
+                log.debug("assets: \n%s" % json.dumps(el, indent=4))
                 yield el
 
     def folders(self):
         elts = self.list(kind='folder')
         if elts['count'] >= 1:
             for el in elts['items']:
+                log.debug("folders: \n%s" % json.dumps(el, indent=4))
                 yield el
 
     def search(self, name, limit=50, offset=0, kind="all", workspace_id=None):
@@ -119,11 +130,13 @@ class SonyCi(object):
                   'offset': offset,
                   'query': name}
         req = requests.get(url, params=params, headers=self.header_auth)
-        return req.json()
+        json_resp = req.json()
+        log.debug(json_resp)
+        return json_resp
 
     def upload(self, file_path, folder_id=None, workspace_id=None, metadata={}):
         if os.path.getsize(file_path) >= 5 * 1024 * 1024:
-            print('Start multipart upload')
+            log.info('Start multipart upload')
             asset_id = self._initiate_multipart_upload(file_path,
                                                        folder_id,
                                                        workspace_id,
@@ -151,6 +164,7 @@ class SonyCi(object):
         url = MULTIPART_URI
         req = requests.post(url, json=data, headers=self.header_auth)
         json_resp = req.json()
+        log.debug("upload: init: %s" % json_resp)
         return json_resp['assetId']
 
     def _do_multipart_upload_part(self, file_path, asset_id):
@@ -168,8 +182,7 @@ class SonyCi(object):
                 # req = requests.put(url, data=buf, headers=headers)
                 req = s.put(url, data=buf, headers=headers)
                 resp = req.text
-                print('Part: %s' % part)
-                print(resp)
+                log.info('upload: part: %s' % part)
 
     def _do_multipart_upload_part_parallel(self, file_path, asset_id):
         from Queue import Queue
@@ -184,7 +197,7 @@ class SonyCi(object):
                 data = q.get()
                 req = requests.put(data[0], data=data[1], headers=headers)
                 resp = req.text
-                print(resp)
+                log.debug('upload: part: %s' % resp)
                 q.task_done()
 
         for i in range(4):
@@ -209,13 +222,14 @@ class SonyCi(object):
         print(url)
         req = requests.post(url, headers=self.header_auth)
         resp = req.text
-        print(resp)
+        log.debug("upload: complete: %s " % resp)
 
     def _singlepart_upload(self, file_path, folder_id, workspace_id):
         files = {'file': open(file_path, 'r')}
         req = requests.post(SINGLEPART_URI,
                             files=files, headers=self.header_auth)
         json_resp = req.json()
+        log.debug('upload: %s' % json_resp)
         return json_resp['assetId']
 
     def create_mediabox(self, name, asset_ids, type, allow_download=False,
@@ -244,6 +258,7 @@ class SonyCi(object):
         req = requests.post(url, json=data, headers=self.header_auth)
 
         json_resp = req.json()
+        log.debug('create_mediabox: %s' % json_resp)
         return json_resp['mediaboxId'], json_resp['link']
 
     def create_folder(self, name, parent_folder_id=None, workspace_id=None):
@@ -261,18 +276,21 @@ class SonyCi(object):
 
         req = requests.post(url, json=data, headers=self.header_auth)
         json_resp = req.json()
+        log.debug('create_folder: %s' % json_resp)
         return json_resp['folderId']
 
     def detail_folder(self, folder_id):
         url = SONYCI_URI + '/folders/%s' % folder_id
         req = requests.get(url, headers=self.header_auth)
         json_resp = req.json()
+        log.debug('detail_folder: %s' % json_resp)
         return json_resp
 
     def delete_folder(self, folder_id):
         url = SONYCI_URI + '/folders/%s' % folder_id
         req = requests.delete(url, headers=self.header_auth)
         json_resp = req.json()
+        log.debug('delete_folder: %s' % json_resp)
 
         if json_resp['message'] == 'Folder was deleted.':
             return True
@@ -283,6 +301,7 @@ class SonyCi(object):
         url = SONYCI_URI + '/folders/%s/trash' % folder_id
         req = requests.post(url, headers=self.header_auth)
         json_resp = req.json()
+        log.debug('trash_folder: %s' % json_resp)
 
         if json_resp['message'] == 'Folder was trashed.':
             return True
@@ -293,6 +312,7 @@ class SonyCi(object):
         url = SONYCI_URI + '/assets/%s/archive' % asset_id
         req = requests.post(url, headers=self.header_auth)
         json_resp = req.json()
+        log.debug('archive: %s' % json_resp)
 
         if json_resp['message'] == 'Asset archive has started.':
             return True
@@ -308,6 +328,7 @@ class SonyCi(object):
 
         req = requests.get(url, headers=self.header_auth)
         json_resp = req.json()
+        log.debug('download: %s' % json_resp)
 
         if json_resp['location']:
             req = requests.get(url=json_resp['location'], stream=True)
@@ -320,6 +341,7 @@ class SonyCi(object):
         url = SONYCI_URI + '/assets/%s'
         req = requests.delete(url, headers=self.header_auth)
         json_resp = req.json()
+        log.debug('delete_asset: %s' % json_resp)
 
         if json_resp['message'] == 'Asset was deleted.':
             return True
@@ -328,6 +350,24 @@ class SonyCi(object):
 
 
 if __name__ == "__main__":
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+
+    formatter = logging.Formatter('%(module)s :: %(asctime)s :: %(levelname)s :: %(message)s')
+
+    # logging to file
+    #file_handler = RotatingFileHandler('vantage_to_ci.log', 'a', 1000000, 1)
+    #file_handler.setLevel(logging.DEBUG)
+    #file_handler.setFormatter(formatter)
+    #logger.addHandler(file_handler)
+
+    # logging to the console
+    steam_handler = logging.StreamHandler()
+    steam_handler.setLevel(logging.DEBUG)
+    steam_handler.setFormatter(formatter)
+    logger.addHandler(steam_handler)
+
     #cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_cap.cfg"
     cfg_file = '/tmp/ci_hw.cfg'
     ci = SonyCi(cfg_file)
@@ -344,8 +384,8 @@ if __name__ == "__main__":
         print f
 
     # get assets
-    #for a in ci.assets():
-    #    print a
+    for a in ci.assets():
+        print a
 
     # for e in ci.items():
     #     print('-' * 80)
@@ -360,7 +400,7 @@ if __name__ == "__main__":
     #                        expiration_days=5)
     # print(m)
 
-    # ci.upload('/Users/predat/Downloads/1080p.mp4')
+    ci.upload('/Users/predat/Downloads/1080p.mp4')
 
     # json_resp = ci.search('TEST', kind='folder')
     # test_folder_id = json_resp['items'][0]['id']
