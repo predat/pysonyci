@@ -17,6 +17,8 @@ SONYCI_URI = "https://api.cimediacloud.com"
 SINGLEPART_URI = 'https://io.cimediacloud.com/upload'
 MULTIPART_URI = 'https://io.cimediacloud.com/upload/multipart'
 CHUNK_SIZE = 10 * 1024 * 1024
+USE_THREADS = False
+
 
 log = logging.getLogger(__name__)
 
@@ -141,7 +143,10 @@ class SonyCi(object):
                                                    folder_id,
                                                    workspace_id,
                                                    metadata)
-        self._do_multipart_upload_part_parallel(file_path, asset_id)
+        if USE_THREADS:
+            self._do_multipart_upload_part_parallel(file_path, asset_id)
+        else:
+            self._do_multipart_upload_part(file_path, asset_id)
         return self._complete_multipart_upload(asset_id)
         #else:
         #    return self._singlepart_upload(file_path, folder_id, workspace_id)
