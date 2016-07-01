@@ -135,16 +135,16 @@ class SonyCi(object):
         return json_resp
 
     def upload(self, file_path, folder_id=None, workspace_id=None, metadata={}):
-        if os.path.getsize(file_path) >= 5 * 1024 * 1024:
-            log.info('Start multipart upload')
-            asset_id = self._initiate_multipart_upload(file_path,
-                                                       folder_id,
-                                                       workspace_id,
-                                                       metadata)
-            self._do_multipart_upload_part_parallel(file_path, asset_id)
-            return self._complete_multipart_upload(asset_id)
-        else:
-            return self._singlepart_upload(file_path, folder_id, workspace_id)
+        #if os.path.getsize(file_path) >= 5 * 1024 * 1024:
+        log.info('Start multipart upload')
+        asset_id = self._initiate_multipart_upload(file_path,
+                                                   folder_id,
+                                                   workspace_id,
+                                                   metadata)
+        self._do_multipart_upload_part_parallel(file_path, asset_id)
+        return self._complete_multipart_upload(asset_id)
+        #else:
+        #    return self._singlepart_upload(file_path, folder_id, workspace_id)
 
     def _initiate_multipart_upload(self, file_path, folder_id=None,
                                    workspace_id=None,
