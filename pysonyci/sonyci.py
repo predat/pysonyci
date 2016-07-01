@@ -137,19 +137,19 @@ class SonyCi(object):
         return json_resp
 
     def upload(self, file_path, folder_id=None, workspace_id=None, metadata={}):
-        #if os.path.getsize(file_path) >= 5 * 1024 * 1024:
-        log.info('Start multipart upload')
-        asset_id = self._initiate_multipart_upload(file_path,
-                                                   folder_id,
-                                                   workspace_id,
-                                                   metadata)
-        if USE_THREADS:
-            self._do_multipart_upload_part_parallel(file_path, asset_id)
+        if os.path.getsize(file_path) >= 5 * 1024 * 1024:
+            log.info('Start multipart upload')
+            asset_id = self._initiate_multipart_upload(file_path,
+                                                       folder_id,
+                                                       workspace_id,
+                                                       metadata)
+            if USE_THREADS:
+                self._do_multipart_upload_part_parallel(file_path, asset_id)
+            else:
+                self._do_multipart_upload_part(file_path, asset_id)
+            return self._complete_multipart_upload(asset_id)
         else:
-            self._do_multipart_upload_part(file_path, asset_id)
-        return self._complete_multipart_upload(asset_id)
-        #else:
-        #    return self._singlepart_upload(file_path, folder_id, workspace_id)
+            return self._singlepart_upload(file_path, folder_id, workspace_id, metadata)
 
     def _initiate_multipart_upload(self, file_path, folder_id=None,
                                    workspace_id=None,
@@ -229,13 +229,20 @@ class SonyCi(object):
         resp = req.text
         log.debug("upload: complete: %s " % resp)
 
-    def _singlepart_upload(self, file_path, folder_id, workspace_id):
+    def _singlepart_upload(self, file_path, folder_id=None, workspace_id=None, metadata={}):
+        #import httplib as http_client
+        #http_client.HTTPConnection.debuglevel = 1
+        #files = {'file': open(file_path, 'r'), 'metadata': ('', "{'metadata': {'foo': 'bar'}, 'id': '123'}")}
+        meta_string = str({'metadata': metadata, 'workspaceId': workspace_id, 'folderId': folder_id})
         files = {'file': open(file_path, 'r')}
+        files['metadata'] = ('', meta_string)
         req = requests.post(SINGLEPART_URI,
                             files=files, headers=self.header_auth)
+        log.debug(req.text)
         json_resp = req.json()
+ 
         log.debug('upload: %s' % json_resp)
-        return json_resp['assetId']
+        #return json_resp['assetId']
 
     def create_mediabox(self, name, asset_ids, type, allow_download=False,
                         recipients=[], message=None, password=None,
@@ -357,7 +364,7 @@ class SonyCi(object):
 if __name__ == "__main__":
 
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter('%(module)s :: %(asctime)s :: %(levelname)s :: %(message)s')
 
@@ -373,8 +380,7 @@ if __name__ == "__main__":
     steam_handler.setFormatter(formatter)
     logger.addHandler(steam_handler)
 
-    #cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_cap.cfg"
-    cfg_file = '/tmp/ci_hw.cfg'
+    cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_hw.cfg"
     ci = SonyCi(cfg_file)
     # print(ci.access_token)
 
@@ -384,13 +390,13 @@ if __name__ == "__main__":
         print w
 
     # get folders
-    for f in ci.folders():
-        #if f['name'] == 'Folder':
-        print f
+    #for f in ci.folders():
+    #    #if f['name'] == 'Folder':
+    #    print f
 
-    # get assets
-    for a in ci.assets():
-        print a
+    ## get assets
+    #for a in ci.assets():
+    #    print a
 
     # for e in ci.items():
     #     print('-' * 80)
@@ -405,7 +411,10 @@ if __name__ == "__main__":
     #                        expiration_days=5)
     # print(m)
 
-    ci.upload('/Users/predat/Downloads/1080p.mp4')
+    #ci.upload('/Users/predat/Downloads/1080p.mp4')
+    print(ci.access_token)
+    meta = {'Avid Workspace': 'Dans_la_jungle_de_la_ville', 'status': 'wipe'}
+    ci.upload('/Users/predat/Desktop/test_small.mp4','','486822a0261b4b468dca2c183d775d72', meta)
 
     # json_resp = ci.search('TEST', kind='folder')
     # test_folder_id = json_resp['items'][0]['id']
