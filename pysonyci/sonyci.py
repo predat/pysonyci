@@ -116,7 +116,7 @@ class SonyCi(object):
                 yield el
 
     def folders(self):
-        elts = self.list(kind='folder')
+        elts = self.list(kind='folder', fields='parentId')
         if elts['count'] >= 1:
             for el in elts['items']:
                 log.debug("folders: \n%s" % json.dumps(el, indent=4))
@@ -224,7 +224,6 @@ class SonyCi(object):
 
     def _complete_multipart_upload(self, asset_id):
         url = MULTIPART_URI + '/%s/complete' % asset_id
-        print(url)
         req = requests.post(url, headers=self.header_auth)
         resp = req.text
         log.debug("upload: complete: %s " % resp)
@@ -240,9 +239,9 @@ class SonyCi(object):
                             files=files, headers=self.header_auth)
         log.debug(req.text)
         json_resp = req.json()
- 
+
         log.debug('upload: %s' % json_resp)
-        #return json_resp['assetId']
+        return json_resp['assetId']
 
     def create_mediabox(self, name, asset_ids, type, allow_download=False,
                         recipients=[], message=None, password=None,
@@ -283,8 +282,6 @@ class SonyCi(object):
             data['workspaceId'] = workspace_id
         else:
             data['workspaceId'] = self.workspace_id
-
-        print('----------------------\n%s' % data )
 
         req = requests.post(url, json=data, headers=self.header_auth)
         json_resp = req.json()
@@ -360,69 +357,3 @@ class SonyCi(object):
         else:
             return False
 
-
-if __name__ == "__main__":
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter('%(module)s :: %(asctime)s :: %(levelname)s :: %(message)s')
-
-    # logging to file
-    #file_handler = RotatingFileHandler('vantage_to_ci.log', 'a', 1000000, 1)
-    #file_handler.setLevel(logging.DEBUG)
-    #file_handler.setFormatter(formatter)
-    #logger.addHandler(file_handler)
-
-    # logging to the console
-    steam_handler = logging.StreamHandler()
-    steam_handler.setLevel(logging.DEBUG)
-    steam_handler.setFormatter(formatter)
-    logger.addHandler(steam_handler)
-
-    cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_hw.cfg"
-    ci = SonyCi(cfg_file)
-    # print(ci.access_token)
-
-    # get workspaces
-    for w in ci.workspaces(fields='name,class'):
-         #if 'Personal' in w['class']:
-        print w
-
-    # get folders
-    #for f in ci.folders():
-    #    #if f['name'] == 'Folder':
-    #    print f
-
-    ## get assets
-    #for a in ci.assets():
-    #    print a
-
-    # for e in ci.items():
-    #     print('-' * 80)
-    #     pprint(e)
-
-    # create Mediabox
-    # m = ci.create_mediabox(name='Test_mediabox',
-    #                        asset_ids=['a6679a183d2942e4a9822096a4ede2d0',
-    #                                   '0b20f616d4d84b148142618bf5376827'],
-    #                        type='Public',
-    #                        recipients=['sylvain@predat.fr'],
-    #                        expiration_days=5)
-    # print(m)
-
-    #ci.upload('/Users/predat/Downloads/1080p.mp4')
-    print(ci.access_token)
-    meta = {'Avid Workspace': 'Dans_la_jungle_de_la_ville', 'status': 'wipe'}
-    ci.upload('/Users/predat/Desktop/test_small.mp4','','486822a0261b4b468dca2c183d775d72', meta)
-
-    # json_resp = ci.search('TEST', kind='folder')
-    # test_folder_id = json_resp['items'][0]['id']
-    # ci.upload('/Users/predat/Downloads/cosmos.mp4', folder_id=test_folder_id)
-
-    # ci.download(asset_id='0b20f616d4d84b148142618bf5376827')
-
-    #folder_id = ci.create_folder(name='Folder')
-    #sub_folder_id = ci.create_folder(name='SubFolder', parent_folder_id=folder_id)
-
-    #print ci.detail_folder('7bd1bde8782a4870a0bbc9ec7b8998be')
