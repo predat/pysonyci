@@ -231,9 +231,15 @@ class SonyCi(object):
     def _singlepart_upload(self, file_path, folder_id=None, workspace_id=None, metadata={}):
         #import httplib as http_client
         #http_client.HTTPConnection.debuglevel = 1
-        #files = {'file': open(file_path, 'r'), 'metadata': ('', "{'metadata': {'foo': 'bar'}, 'id': '123'}")}
-        meta_string = str({'metadata': metadata, 'workspaceId': workspace_id, 'folderId': folder_id})
-        files = {'file': open(file_path, 'r')}
+        files = {'file': open(file_path, 'r'), 'metadata': ('', "{'metadata': {}}")}
+        meta = {'metadata': metadata}
+        if workspace_id:
+            meta['workspaceId'] = workspace_id
+        else:
+            meta['workspaceId'] = self.workspace_id
+        if folder_id:
+            meta['folderId'] = folder_id
+        meta_string = str(meta)
         files['metadata'] = ('', meta_string)
         req = requests.post(SINGLEPART_URI,
                             files=files, headers=self.header_auth)
@@ -356,4 +362,34 @@ class SonyCi(object):
             return True
         else:
             return False
+
+if __name__ == "__main__":
+
+    #logger = logging.getLogger()
+    #logger.setLevel(logging.DEBUG)
+
+    #formatter = logging.Formatter('%(module)s :: %(asctime)s :: %(levelname)s :: %(message)s')
+
+    # logging to file
+    #file_handler = RotatingFileHandler('vantage_to_ci.log', 'a', 1000000, 1)
+    #file_handler.setLevel(logging.DEBUG)
+    #file_handler.setFormatter(formatter)
+    #logger.addHandler(file_handler)
+
+    # logging to the console
+    #steam_handler = logging.StreamHandler()
+    #steam_handler.setLevel(logging.INFO)
+    #steam_handler.setFormatter(formatter)
+    #logger.addHandler(steam_handler)
+
+    cfg_file = "/Users/predat/Documents/dev/sony_ci/python/sonyci/config/ci_hw.cfg"
+    ci = SonyCi(cfg_file)
+    # print ' token %s' % ci.access_token
+
+
+    folder_id = "93caf47dc80b40aca96bf37667908043" # toto
+    meta = {'foo': 'bar'}
+    ci.upload('/Users/predat/30x15.jpg', folder_id=folder_id, metadata=meta)
+    #ci.upload('/Users/predat/30x15.jpg')
+
 
